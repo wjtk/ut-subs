@@ -6,7 +6,7 @@
 
 (function(args, fs, console){
     'use strict';
-    var APP_NAME = 'ut-subs.js v1.0.1';
+    var APP_NAME = 'ut-subs.js v1.0.2-SNAPSHOT';
 
      /*
      Time format:
