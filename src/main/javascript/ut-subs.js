@@ -1,10 +1,6 @@
-/*global require, console, process */
+/*global require, console, process, exports, module */
 
-
-//TODO - testowalność komponentów
-
-
-(function(args, fs, console){
+(function(args, fs, console, exports, module){
     'use strict';
     var APP_NAME = 'ut-subs.js v1.0.2-SNAPSHOT';
 
@@ -17,132 +13,221 @@
      Lines:
          ###
          <text>
-         ###                   //mulit
+         ###
          ###
          <text>
 
-     Chcemy:
+     Wanted:
         02:03:03:<tekst>
       */
 
-    function nextLineGetter(data) {
-        var last = 0,
+    //--------------------------------------------------------------------
+
+    //The Function: no-deps
+    function nextLineGetter()  {
+        return function(data) {
+            var last = 0,
+                L;
+
+            data = data.replace(/\r/g,'');   //get rid of \r
             L = data.length;
 
-        return function() {
-            var next = data.indexOf('\n', last),
-                line;
+            return function() {
+                var next = data.indexOf('\n', last),
+                    line;
 
-            if( next === -1) {
-                if( last < L) {
-                    next = L;
-                } else {
-                    return null;
+                if( next === -1) {
+                    if( last < L) {
+                        next = L;
+                    } else {
+                        return null;
+                    }
                 }
-            }
-            line = data.slice(last, next);
-            last = next + 1;
-            return line;
+                line = data.slice(last, next);
+                last = next + 1;
+                return line;
+            };
         };
     }
 
-    function UtTime(minPart, secPart) {
-        if( !(this instanceof UtTime)) {
-            throw new Error('[UtTime] is constructor, should be called with new');
+    //--------------------------------------------------------------------
+
+    //The Function: no-deps, data-object-constructor
+    function utTime() {
+        function UtTime(minPart, secPart) {
+            if( !(this instanceof UtTime)) {
+                throw new Error('[UtTime] is constructor, should be called with new');
+            }
+            this.minutes = parseInt(minPart, 10);
+            this.seconds = parseInt(secPart, 10);
         }
-        this.minutes = parseInt(minPart);
-        this.seconds = parseInt(secPart);
+
+        UtTime.prototype.isGreaterThanOrEqualTo = function(other) {
+            if( this.minutes > other.minutes ) { return true; }
+            return (this.minutes === other.minutes) && (this.seconds >= other.seconds);
+        };
+
+        return UtTime;
     }
 
-    UtTime.prototype.isGreaterThanOrEqualTo = function(other) {
-        if( this.minutes > other.minutes ) { return true; }
-        return this.seconds >= other.seconds;
-    };
+    //--------------------------------------------------------------------
 
-
-    function getConvertedLine(time, text) {
-        var h = Math.floor(time.minutes / 60),
-            m = time.minutes - h*60,
-            s = time.seconds;
+    //The Object: no deps
+    function tmplayerFormatter() {
+        var out = '';
 
         function getStrElem(elem) {
             return (elem < 10 ? '0' : '') + elem;
         }
-        return getStrElem(h) + ':' + getStrElem(m) + ':' + getStrElem(s) + ':' + text + '\n';
+
+        function nextLine(time, text) {
+            var h = Math.floor(time.minutes / 60),
+                m = time.minutes - h*60,
+                s = time.seconds;
+            out += getStrElem(h) + ':' + getStrElem(m) + ':' + getStrElem(s) + ':' + text + '\n';
+        }
+
+        return {
+            nextLine : nextLine,
+            getDataOut :function() { return out; }
+        };
     }
 
+    //--------------------------------------------------------------------
 
-    function convert(data){
+    //The Function:
+    function dataConverter(nextLineGetter, UtTime, formatter) {
 
-        var timeRgx = /^\s*(\d+):(\d{2})/,
-            nextLine,
-            line,
-            lastTime = null,
-            newTime = null,
-            lineNo = 0,
-            match,
-            dataOut = '';
+        function rightTrim(str) {
+            return str.replace(/\s*$/,'');
+        }
 
-        data = data.replace(/\r/g,'');   //get rid of \r, jak dałem '\r' to nie zadziałało. js nie uznaje?
-        nextLine = nextLineGetter(data);
-
-        while((line = nextLine()) !== null) {
-            lineNo += 1;
-            match = timeRgx.exec(line);
-
-            if( !!match) {
-                newTime = new UtTime(match[1], match[2]);
-                if( !!lastTime && !newTime.isGreaterThanOrEqualTo(lastTime)) {
-                    throw new Error('Time is not in order, line: ' + lineNo);
-                }
-                lastTime = newTime;  //jak powtórzony czas to po prostu pomijamy
-            } else {
-                //linia z tekstem?
-                if( !lastTime ) {
-                    throw new Error('Line with text was not preceded by line with time, line:' + lineNo);
-                }
-                dataOut += getConvertedLine(lastTime, line);
-                lastTime = null;
+        function checkTimeOrder(prevTime, nowTime, lineNo) {
+            if( !!prevTime && !nowTime.isGreaterThanOrEqualTo(prevTime)) {
+                throw new Error('Time is not in order, line no: ' + lineNo);
             }
         }
-        return dataOut;
+
+        return function(data){
+            var timeRgx = /^\s*(\d+):(\d{2})/,
+                nextLine,
+                line,
+                lastTime = null,    //lastTime in accepted time-line, text-line pair
+                currentTime = null, //currentTime for next text-line
+                newTime = null,     //currently read time
+                lineNo = 0,
+                match;
+
+
+            nextLine = nextLineGetter(data);
+
+            while((line = nextLine()) !== null) {
+                lineNo += 1;
+                match = timeRgx.exec(line);
+
+                if( !!match) {
+                    newTime = new UtTime(match[1], match[2]);
+                    checkTimeOrder(currentTime, newTime, lineNo);
+                    currentTime = newTime;  //if two lines with time we simply forget previous, without text
+                } else {
+                    if((line = rightTrim(line))!=='') {  //if empty line, we just ignore it
+                        //linia z tekstem?
+                        if( !currentTime ) {
+                            throw new Error('Text-line was not preceded by time-line, line no: ' + lineNo);
+                        }
+                        checkTimeOrder(lastTime, currentTime, lineNo);
+                        formatter.nextLine(currentTime, line);
+                        lastTime = currentTime;
+                        currentTime = null;
+                    }
+                }
+            }
+            return formatter.getDataOut();
+        };
     }
 
-    function saveFile(options, dataOut) {
-        fs.writeFile(options.path + '.ut-subs', dataOut, { encoding: options.outEnc}, function(err){
-            if(err) { throw err; }
-        });
-    }
+    //--------------------------------------------------------------------
 
-    function convertFile(options) {
-        fs.readFile( options.path, { encoding: options.inEnc}, function(err, data){
-            if(err) { throw err; }
-            var dataOut = convert(data);
-            saveFile(options, dataOut);
-        });
-    }
-
-
-    function main(args) {
-        if(args.length < 3) {
-            console.log('usage:');
-            console.log('node ut-subs.js <file-to-conver> [in-encoding] [out-encoding]');
-            console.log('node ut-subs.js -version');
-            return;
+    //The Function:
+	function fileConverter( fs, convertData ) {
+        function saveFile(options, dataOut) {
+            fs.writeFile(options.path + '.ut-subs', dataOut, { encoding: options.outEnc}, function(err){
+                if(err) { throw err; }
+            });
         }
-		if( args[2] === '-version' ) {
-			console.log(APP_NAME);
-			return;
-		}		
-        convertFile({
-            path : args[2],
-            inEnc: !!args[3] ? args[3] : 'utf-8',
-            outEnc: !!args[4] ? args[3] : 'utf-8'
-        });
+
+        return function(options) {
+            fs.readFile( options.path, { encoding: options.inEnc}, function(err, data){
+                if(err) { throw err; }
+                var dataOut = convertData(data);
+                saveFile(options, dataOut);
+            });
+        };
+	}
+
+    //--------------------------------------------------------------------
+
+    //The Function:
+    function runner(console, convertFile) {
+        return function(args) {
+            var convertOptions;
+
+            if(args.length < 3) {
+                console.log('usage:');
+                console.log('node ut-subs.js <file-to-conver> [in-encoding] [out-encoding]');
+                console.log('node ut-subs.js --version');
+                return;
+            }
+            if( args[2] === '--version' ) {
+                console.log(APP_NAME);
+                return;
+            }
+            convertOptions = {
+                path : args[2],
+                inEnc: !!args[3] ? args[3] : 'utf-8',
+                outEnc: !!args[4] ? args[4] : 'utf-8'
+            };
+            convertFile(convertOptions);
+        };
     }
 
-    main(args);
+    //--------------------------------------------------------------------
 
-})(process.argv, require('fs'), console);
+    function standardRunGraph(console, fs) {
+        //creating dependency graph
+        var _nextLineGetter_ = nextLineGetter(),
+            _UtTime_ = utTime(),
+            _formatter_ = tmplayerFormatter(),
+            _convertData_ = dataConverter(_nextLineGetter_, _UtTime_, _formatter_),
+            _convertFile = fileConverter(fs, _convertData_),
+            _runner_ = runner(console, _convertFile);
+
+        return function(args) {
+            _runner_(args);
+        };
+    }
+
+    //--------------------------------------------------------------------
+
+    if(require.main === module) {
+
+        //called directly, run!
+        standardRunGraph(console, fs)(args);
+
+    } else {
+
+        // else - require as module, maybe for unit tests?
+        // do nothing, only export.
+        exports.APP_NAME = APP_NAME;
+        exports.nextLineGetter = nextLineGetter;
+        exports.utTime = utTime;
+        exports.tmplayerFormatter = tmplayerFormatter;
+        exports.dataConverter = dataConverter;
+        exports.fileConverter = fileConverter;
+        exports.standardRunGraph = standardRunGraph;
+        exports.runner = runner;
+    }
+
+})(process.argv, require('fs'), console, exports, module);
 
 
