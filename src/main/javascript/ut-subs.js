@@ -6,7 +6,7 @@
 
 (function(args, fs, console){
     'use strict';
-    var APP_NAME = 'ut-subs.js v1.0.2-SNAPSHOT';
+    var APP_NAME = 'ut-subs.js v1.0.2';
 
      /*
      Time format:
@@ -56,8 +56,7 @@
 
     UtTime.prototype.isGreaterThanOrEqualTo = function(other) {
         if( this.minutes > other.minutes ) { return true; }
-        if( this.seconds >= other.seconds ) { return true; }
-        return false;
+        return this.seconds >= other.seconds;
     };
 
 
