@@ -6,6 +6,7 @@
 
 (function(args, fs, console){
     'use strict';
+    var APP_NAME = 'ut-subs.js v1.0';
 
      /*
      Time format:
@@ -127,7 +128,13 @@
         if(args.length < 3) {
             console.log('usage:');
             console.log('node ut-subs.js <file-to-conver> [in-encoding] [out-encoding]');
+            console.log('node ut-subs.js -version');
+            return;
         }
+		if( args[2] === '-version' ) {
+			console.log(APP_NAME);
+			return;
+		}		
         convertFile({
             path : args[2],
             inEnc: !!args[3] ? args[3] : 'utf-8',
