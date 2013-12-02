@@ -20,7 +20,7 @@
 
 (function(process, fs, console, exports, module){
     'use strict';
-    var APP_NAME = 'ut-subs.js v1.1.0';
+    var APP_NAME = 'ut-subs.js v1.1.0-SNAPSHOT';
 
     //--------------------------------------------------------------------
 
