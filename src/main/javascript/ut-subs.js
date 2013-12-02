@@ -1,25 +1,26 @@
 /*global require, console, process, exports, module */
 
+/*
+ Time format:
+     1:01
+     10:01
+     127:01
+
+
+ Lines(### - time-lines):
+     ###
+     <text>
+     ###
+     ###
+     <text>
+
+ Wanted:
+     02:03:03:<text>
+ */
+
 (function(args, fs, console, exports, module){
     'use strict';
     var APP_NAME = 'ut-subs.js v1.0.2-SNAPSHOT';
-
-     /*
-     Time format:
-         1:01
-         10:01
-         127:01
-
-     Lines:
-         ###
-         <text>
-         ###
-         ###
-         <text>
-
-     Wanted:
-        02:03:03:<tekst>
-      */
 
     //--------------------------------------------------------------------
 

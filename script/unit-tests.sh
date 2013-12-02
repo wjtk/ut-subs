@@ -1,4 +1,10 @@
 #!/bin/sh
 # run from main project dir
 
-jasmine-node --verbose --autotest src/test/javascript --watch src/main/javascript/*
+
+if [ ! -f script/unit-tests.sh ]; then
+    echo "script should be run from main project directory!"
+    exit
+fi
+
+jasmine-node --verbose --autotest src/test/javascript/unit --watch src/main/javascript/*

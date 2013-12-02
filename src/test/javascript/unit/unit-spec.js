@@ -3,7 +3,7 @@
 
 (function(){
     'use strict';
-    var UT = require('../../main/javascript/ut-subs.js');
+    var UT = require('../../../main/javascript/ut-subs.js');
 
 
     describe('utTime', function(){
