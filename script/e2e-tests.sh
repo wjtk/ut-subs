@@ -8,5 +8,5 @@ fi
 
 rm -rf target/e2e-data
 mkdir -p target/e2e-data
-cp src/test/javascript/e2e/e2e-data/* target/e2e-data
+cp src/test/resources/e2e-data/* target/e2e-data
 jasmine-node --verbose src/test/javascript/e2e

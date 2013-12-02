@@ -1,100 +1,90 @@
 /*global require */
-/* global jasmine, describe, expect, it, xit, beforeEach, afterEach, spyOn */     //jasmine
+/* global jasmine, describe, xdescribe, expect, it, xit, beforeEach, afterEach, spyOn, runs, waitsFor */     //jasmine
 
 /* global console */
 /* global asyncSpecDone, asyncSpecWait */
+
 
 var fs = require('fs');
 var exec = require('child_process').exec;
 
 
-beforeEach(function() {
-    'use strict';
-
-    this.addMatchers({
-        toHaveEqualContent: function(expectedFile) {
-            this.message = function() {
-                var notTxt = this.isNot ? ' not ' : ' ';
-                return 'Expected files' + notTxt +  'to have equal content:\n' +
-                    '\t1) ' + this.actual.getPath() + '\n' +
-                    '\t2) ' + expectedFile.getPath();
-            };
-            return this.actual.getContent() === expectedFile.getContent();
-        }
-    });
-});
-
-
-
-function FileContent(path, flagDone, encoding) {
-    'use strict';
-    var content;
-    encoding = !encoding ? 'utf-8' : encoding;
-
-    this.getContent = function() {
-        return content;
-    };
-
-    this.getPath = function() {
-        return path;
-    };
-
-    fs.readFile( path, { encoding: encoding }, function(err, data){
-        if(err) { throw err; }
-        content = data.replace(/\r/g, '');
-        flagDone.taskDone();
-    });
-}
-
-
-function FlagSpecDone(countBarrier) {
-    'use strict';
-    var
-        count = 0,
-        noop = function(){},
-        expectFn = noop,
-        taskDoneListener = noop;
-
-
-    asyncSpecWait();
-
-    function funOrNoop(fun) {
-        return (typeof fun === 'function') ? fun : noop;
-    }
-    this.setExpectFun = function(fun) {
-        expectFn = funOrNoop(fun);
-    };
-    this.setTaskDoneListener = function(fun) {
-        taskDoneListener = funOrNoop(fun);
-    };
-
-    this.taskDone = function() {
-        count += 1;
-        taskDoneListener(count);
-        if(count >= countBarrier) {
-            expectFn();
-            asyncSpecDone();
-        }
-    };
-}
-
-
 describe('e2e test', function(){
     'use strict';
 
-    function testConversion(pSource, pConverted, pExpected) {
-        var flag = new FlagSpecDone(2),
-            fConverted, fExpected;
+    function testConversion(pSource, pConverted, pExpected, sourceEncodingOpt, targetEncodingOpt) {
+        var flag = {};
 
-        exec('node src/main/javascript/ut-subs.js ' + pSource, function(err){
-            if(err) { throw err; }
-            fConverted = new FileContent(pConverted, flag);
-            fExpected = new FileContent(pExpected, flag);
-            flag.setExpectFun(function() {
-                expect(fConverted).toHaveEqualContent(fExpected);
+        function wait(message) {
+            waitsFor(function(){ return flag.further;}, message, 2000);
+        }
+
+        function clearWaitingOrThrow() {
+            if(flag.err) {
+                if(!!flag.stdOut || flag.stdErr) {
+                    console.log('e2e>> Error occurred with additional info:');
+                    console.log('e2e>> ERR:' + flag.err);
+                    console.log('e2e>> STDOUT: ' + flag.stdOut);
+                    console.log('e2e>> STDERR: ' + flag.stdErr);
+                }
+                throw flag.err;
+            }
+            flag.further = false;
+            flag.err = null;
+            flag.stdOut = null;
+            flag.stdErr = null;
+        }
+
+        function goFurther(flag, err) {
+            flag.err = err;
+            flag.further = true;
+        }
+
+        function readFile(path, flag, encoding) {
+            encoding = !encoding ? 'utf-8' : encoding;
+            flag.content = null;
+            fs.readFile( path, { encoding: encoding }, function(err, data){
+                flag.content = data;
+                goFurther(flag, err);
+            });
+        }
+
+        //-----------
+        sourceEncodingOpt = !sourceEncodingOpt ? '' : sourceEncodingOpt;
+
+        runs(function(){
+            clearWaitingOrThrow();
+            exec('node src/main/javascript/ut-subs.js ' + pSource + ' ' + sourceEncodingOpt, function(err, stdout, stdErr){
+                flag.stdOut = '' + stdout;
+                flag.stdErr = '' + stdErr;
+                goFurther(flag, err);
             });
         });
 
+        wait('should convert file with "ut-subs"');
+
+        runs(function(){
+            clearWaitingOrThrow();
+            readFile(pConverted, flag, targetEncodingOpt);
+        });
+
+        wait('should read converted file');
+
+        runs(function(){
+            clearWaitingOrThrow();
+            flag.convertedContent = flag.content;
+            readFile(pExpected, flag, targetEncodingOpt);
+        });
+
+        wait('should read expected file');
+
+        runs(function(){
+            clearWaitingOrThrow();
+            flag.expectedContent = flag.content;
+
+            //At last, comparing contents
+            expect(flag.convertedContent.replace(/\r/g,'')).toBe(flag.expectedContent.replace(/\r/g,''));
+        });
     }
 
     it('should convert from utf-8 to utf-8', function(){
@@ -102,7 +92,14 @@ describe('e2e test', function(){
     });
 
 
-    it('raw use of [asyncSpecWait/Done] - this is only info to not to wait for other expect()\'s', function(){
+     it('should convert from utf-16le to utf-8', function(){
+        testConversion('target/e2e-data/ex2(utf-16le).txt', 'target/e2e-data/ex2(utf-16le).txt.ut-subs', 'target/e2e-data/ex2(utf-8).expected', 'utf-16le');
+     });
+
+
+    //-----------------------------------------------------
+
+    it('raw use of [asyncSpecWait/Done] (All ok, BUT if exception in timeout callback, all disappear silently!)', function(){
         var ok = false;
 
         asyncSpecWait();
@@ -113,34 +110,17 @@ describe('e2e test', function(){
             setTimeout(function(){
                 ok = true;
                 expect(ok).toBe(true);
+                //throw 'this is not safe, I rather like jasmine way'
                 asyncSpecDone();
             },50);
         },100);
         expect(ok).toBe(false);
     });
-
-
-    it('test of "FlagSpecDone", for 3. tasks', function(){
-        var f = new FlagSpecDone(3);
-        var i = 0;
-
-        function inc() {
-            i +=1;
-            f.taskDone();
-        }
-
-        console.log('test of "FlagSpecDone, counting....');
-        f.setTaskDoneListener( function(count){
-            console.log('flag: ' + count);
-        });
-
-        setTimeout(inc,1500);
-        setTimeout(inc,1000);
-        setTimeout(inc,500);
-        f.setExpectFun(function() {
-            expect(i).toBe(3);      //Important! expect() have to be inside callback!
-        });
-    });
-
-
 });
+
+//---------------------------------------------------------
+
+
+
+
+

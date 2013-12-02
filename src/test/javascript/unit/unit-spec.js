@@ -189,7 +189,7 @@
     });
 
     describe('fileConverter', function(){
-        var convertFile, convertDataMock, fileSystemMock,
+        var convertFile, convertDataMock, fileSystemMock, excHandlerMock,
             DATA = 'data', DATA_OUT = 'data_out',
             convertOptions = { path: 'path-to-file', inEnc : 'in-enc', outEnc : 'out-enc' },
             writeError, readError;
@@ -211,11 +211,12 @@
         beforeEach(function(){
             writeError = null;
             readError = null;
+            excHandlerMock = jasmine.createSpy();
             convertDataMock = jasmine.createSpy().andReturn(DATA_OUT);
             fileSystemMock = { writeFile : null, readFile : null };
             spyOn(fileSystemMock, 'writeFile').andCallFake( fsWriteFake );
             spyOn(fileSystemMock, 'readFile').andCallFake( fsReadFake );
-            convertFile = UT.fileConverter(fileSystemMock, convertDataMock);
+            convertFile = UT.fileConverter(fileSystemMock, convertDataMock, excHandlerMock);
         });
 
         describe('happy path', function(){
@@ -236,14 +237,16 @@
             });
         });
 
-        it('should rethrow exception on file read', function(){
+        it('should pass exception to exceptionHandler on file read', function(){
             readError = { x: 'read-exc' };
-            expect(callConvertFileWithOptions).toThrow(readError);
+            callConvertFileWithOptions();
+            expect(excHandlerMock).toHaveBeenCalledWith(readError);
         });
 
-        it('should rethrow exception on file write', function(){
+        it('should pass exception to exceptionHandler on file write', function(){
             writeError = { x: 'write-exc' };
-            expect(callConvertFileWithOptions).toThrow(writeError);
+            callConvertFileWithOptions();
+            expect(excHandlerMock).toHaveBeenCalledWith(writeError);
         });
     });
 

@@ -18,7 +18,7 @@
      02:03:03:<text>
  */
 
-(function(args, fs, console, exports, module){
+(function(process, fs, console, exports, module){
     'use strict';
     var APP_NAME = 'ut-subs.js v1.0.2-SNAPSHOT';
 
@@ -150,18 +150,17 @@
     //--------------------------------------------------------------------
 
     //The Function:
-	function fileConverter( fs, convertData ) {
+	function fileConverter( fs, convertData, exceptionHandler ) {
         function saveFile(options, dataOut) {
             fs.writeFile(options.path + '.ut-subs', dataOut, { encoding: options.outEnc}, function(err){
-                if(err) { throw err; }
+                exceptionHandler(err);
             });
         }
 
         return function(options) {
             fs.readFile( options.path, { encoding: options.inEnc}, function(err, data){
-                if(err) { throw err; }
-                var dataOut = convertData(data);
-                saveFile(options, dataOut);
+                exceptionHandler(err);
+                saveFile(options, convertData(data));
             });
         };
 	}
@@ -194,13 +193,26 @@
 
     //--------------------------------------------------------------------
 
+    function exceptionHandlerPrintExit(process, console) {
+        return function(err) {
+            if(err) {
+                console.log('Exception occurred:\n' + err);
+                console.log('Stack:\n' + err.stack);
+                process.exit(1);
+            }
+        };
+    }
+
+    //--------------------------------------------------------------------
+
     function standardRunGraph(console, fs) {
         //creating dependency graph
         var _nextLineGetter_ = nextLineGetter(),
             _UtTime_ = utTime(),
             _formatter_ = tmplayerFormatter(),
+            _exceptionHandler_ = exceptionHandlerPrintExit(process, console),
             _convertData_ = dataConverter(_nextLineGetter_, _UtTime_, _formatter_),
-            _convertFile = fileConverter(fs, _convertData_),
+            _convertFile = fileConverter(fs, _convertData_, _exceptionHandler_),
             _runner_ = runner(console, _convertFile);
 
         return function(args) {
@@ -211,9 +223,8 @@
     //--------------------------------------------------------------------
 
     if(require.main === module) {
-
         //called directly, run!
-        standardRunGraph(console, fs)(args);
+        standardRunGraph(console, fs)(process.argv);
 
     } else {
 
@@ -229,6 +240,6 @@
         exports.runner = runner;
     }
 
-})(process.argv, require('fs'), console, exports, module);
+})(process, require('fs'), console, exports, module);
 
 
