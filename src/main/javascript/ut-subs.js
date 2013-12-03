@@ -154,6 +154,7 @@
         function saveFile(options, dataOut) {
             fs.writeFile(options.path + '.ut-subs', dataOut, { encoding: options.outEnc}, function(err){
                 exceptionHandler(err);
+                //program end
             });
         }
 
@@ -205,7 +206,7 @@
 
     //--------------------------------------------------------------------
 
-    function standardRunGraph(console, fs) {
+    function standardRunGraph(console, fs, process) {
         //creating dependency graph
         var _nextLineGetter_ = nextLineGetter(),
             _UtTime_ = utTime(),
@@ -236,8 +237,10 @@
         exports.tmplayerFormatter = tmplayerFormatter;
         exports.dataConverter = dataConverter;
         exports.fileConverter = fileConverter;
-        exports.standardRunGraph = standardRunGraph;
+        exports.exceptionHandlerPrintExit = exceptionHandlerPrintExit;
         exports.runner = runner;
+        exports.standardRunGraph = standardRunGraph;
+
     }
 
 })(process, require('fs'), console, exports, module);

@@ -1,13 +1,42 @@
 /*global require */
-/* global jasmine, describe, expect, it, xit, beforeEach, afterEach, spyOn */     //jasmine
+/* global jasmine, describe, expect, it, xit, beforeEach, afterEach, spyOn, createSpyObj */     //jasmine
 
 (function(){
     'use strict';
     var UT = require('../../../main/javascript/ut-subs.js');
+    var UtTime = UT.utTime();
+
+    //helpers --------------------------------------------
+
+    function FakeFsReadFile() {
+        var readError = null, readData = null;
+
+        this.setReadErrData = function(err, data) {
+                readError = err;
+                readData = data;
+        };
+
+        this.readFile = function(path, optionsInEncoding, callbackErrData) {
+                callbackErrData(readError, readData);
+        };
+    }
+
+    function FakeFsWriteFile() {
+        var writeError = null;
+
+        this.setWriteErr = function(err) {
+            writeError = err;
+        };
+
+        this.writeFile = function(path, dataOut, optionsOutEncoding, callbackErr) {
+            callbackErr(writeError);
+        };
+    }
+
+    //helpers ^^^--------------------------------------------
 
 
     describe('utTime', function(){
-        var UtTime = UT.utTime();
 
         it('should create object with numerical properties', function(){
             var t = new UtTime('123','23');
@@ -44,6 +73,7 @@
 
         it('should return lines', function(){
             var nextLine = nextLineGetter('aaa\r\n1 2\n67 b');
+
             expect(nextLine()).toBe('aaa');
             expect(nextLine()).toBe('1 2');
             expect(nextLine()).toBe('67 b');
@@ -53,6 +83,7 @@
 
         it('should return empty lines', function(){
             var nextLine = nextLineGetter('\n\n');
+
             expect(nextLine()).toBe('');
             expect(nextLine()).toBe('');
             expect(nextLine()).toBe(null);
@@ -60,33 +91,45 @@
 
         it('should return null if data is empty', function(){
             var nextLine = nextLineGetter('');
+
             expect(nextLine()).toBe(null);
         });
     });
 
-    describe('dataConverter', function(){
-        var UtTime = UT.utTime(),
-            convertData, formatterMock,
-            lines, DATA ='DATA', DATA_OUT = 'DATA_OUT';
 
-        function nextLineGetterFake(data) {
-            var i = 0;
-            expect(data).toBe(DATA);
-            return function() {
-                if(i >= lines.length ) { return null; }
-                return lines[i++];
+    describe('dataConverter', function(){
+        var convertData, formatterMock,
+            DATA ='DATA', DATA_OUT = 'DATA_OUT', nextLineFake;
+
+        function NextLineFake() {
+            var lines;
+
+            this.setInputLines = function(lines_) {
+                lines = lines_;
+            };
+
+            this.nextLineGetter = function(data) {
+                var i = 0;
+                expect(data).toBe(DATA);
+                return function() {
+                    if(i >= lines.length ) { return null; }
+                    return lines[i++];
+                };
             };
         }
 
         beforeEach(function(){
+            nextLineFake = new NextLineFake();
+            nextLineFake.setInputLines([]);
             formatterMock = { nextLine : null, getDataOut : null };
             spyOn(formatterMock, 'nextLine');
             spyOn(formatterMock, 'getDataOut').andReturn(DATA_OUT);
-            convertData = UT.dataConverter(nextLineGetterFake, UtTime, formatterMock);
+            convertData = UT.dataConverter(nextLineFake.nextLineGetter, UtTime, formatterMock);
         });
 
         it('should convert correctly, simple example', function(){
-            lines = ['0:11', 'first', '12:22', 'second'];
+            nextLineFake.setInputLines(['0:11', 'first', '12:22', 'second']);
+
             expect(convertData(DATA)).toBe(DATA_OUT);
 
             expect(formatterMock.nextLine.calls.length).toBe(2);
@@ -96,53 +139,61 @@
         });
 
         it('should throw that times are not in order', function(){
-            lines = ['0:10', 'jeden', '0:09', 'dwa'];
+            nextLineFake.setInputLines(['0:10', 'first', '0:09', 'second']);
+
             expect( function() {convertData(DATA); }).toThrow('Time is not in order, line no: 4');
         });
 
         it('should throw that times are not in order, for multiple time-lines', function(){
-            lines = ['0:10', '0:15', '0:14', 'dwa'];
+            nextLineFake.setInputLines(['0:10', '0:15', '0:14', 'line']);
+
             expect( function() {convertData(DATA); }).toThrow('Time is not in order, line no: 3');
         });
 
         it('should omit multiple time lines', function(){
-            lines = ['0:11', '0:15', '0:17', 'line'];
+            nextLineFake.setInputLines(['0:11', '0:15', '0:17', 'line']);
+
             convertData(DATA);
+
             expect(formatterMock.nextLine.calls.length).toBe(1);
             expect(formatterMock.nextLine).toHaveBeenCalledWith(new UtTime('0','17'), 'line');
         });
 
         it('should throw that text-line was not preceded by time-line', function(){
-            lines = ['0:11', 'text', 'text2'];
+            nextLineFake.setInputLines(['0:11', 'text', 'text2']);
             expect( function() { convertData(DATA); }).toThrow('Text-line was not preceded by time-line, line no: 3');
-            lines = ['text'];
+
+            nextLineFake.setInputLines(['text']);
             expect( function() { convertData(DATA); }).toThrow('Text-line was not preceded by time-line, line no: 1');
         });
 
         it('should omit empty lines', function(){
-            lines = ['0:11', '', '', 'text'];
+            nextLineFake.setInputLines(['0:11', '', '', 'text']);
+
             convertData(DATA);
+
             expect(formatterMock.nextLine.calls.length).toBe(1);
             expect(formatterMock.nextLine).toHaveBeenCalledWith(new UtTime('0','11'), 'text');
         });
 
         it('should right trim text lines', function(){
-            lines = ['0:11', 'text             '];
+            nextLineFake.setInputLines(['0:11', 'text             ']);
+
             convertData(DATA);
             expect(formatterMock.nextLine).toHaveBeenCalledWith(new UtTime('0','11'), 'text');
         });
 
         it('should ignore right spaces in time lines', function(){
-            lines = ['0:11  ', 'text'];
+            nextLineFake.setInputLines(['0:11  ', 'text']);
             convertData(DATA);
             expect(formatterMock.nextLine).toHaveBeenCalledWith(new UtTime('0','11'), 'text');
 
         });
     });
 
+
     describe('tmplayerFormatter', function(){
-        var formatter = UT.tmplayerFormatter(),
-            UtTime = UT.utTime();
+        var formatter = UT.tmplayerFormatter();
 
         it('should format correctly', function(){
             formatter.nextLine( new UtTime('123','09'), 'first' );
@@ -157,67 +208,64 @@
         });
     });
 
+
     describe('runner', function(){
         var runner, consoleMock, convertFileMock;
 
         beforeEach(function() {
-            consoleMock = { log : null};
-            spyOn(consoleMock, 'log');
+            consoleMock = jasmine.createSpyObj('consoleMock', ['log']);
             convertFileMock = jasmine.createSpy();
             runner = UT.runner(consoleMock, convertFileMock);
         });
 
         it('should show usage when there are only 2 args', function(){
             runner(['node', 'script']);
+
             expect(consoleMock.log).toHaveBeenCalledWith('usage:');
         });
 
         it('should show version with --version', function(){
             runner(['node', 'script', '--version']);
+
             expect(consoleMock.log).toHaveBeenCalledWith(UT.APP_NAME);
         });
 
         it('should call convert() with path and default encoding', function(){
             runner(['node', 'script', 'path-to-file']);
+
             expect(convertFileMock).toHaveBeenCalledWith({ path : 'path-to-file', inEnc : 'utf-8', outEnc : 'utf-8'});
         });
 
         it('should call convert() with given enodings', function(){
             runner(['node', 'script', 'path', 'in', 'out']);
+
             expect(convertFileMock).toHaveBeenCalledWith({ path : 'path', inEnc : 'in', outEnc : 'out'});
         });
     });
+
 
     describe('fileConverter', function(){
         var convertFile, convertDataMock, fileSystemMock, excHandlerMock,
             DATA = 'data', DATA_OUT = 'data_out',
             convertOptions = { path: 'path-to-file', inEnc : 'in-enc', outEnc : 'out-enc' },
-            writeError, readError;
-
-        //noinspection JSUnusedLocalSymbols
-        function fsReadFake(path, optionsInEncoding, callbackErrData) {
-            callbackErrData(readError, DATA);
-        }
-
-        //noinspection JSUnusedLocalSymbols
-        function fsWriteFake(path, dataOut, optionsOutEncoding, callbackErr) {
-            callbackErr(writeError);
-        }
+            fakeRead, fakeWrite;
 
         function callConvertFileWithOptions() {
             convertFile(convertOptions);
         }
 
         beforeEach(function(){
-            writeError = null;
-            readError = null;
+            fakeRead = new FakeFsReadFile();
+            fakeWrite = new FakeFsWriteFile();
+            fakeRead.setReadErrData(null, DATA);
             excHandlerMock = jasmine.createSpy();
             convertDataMock = jasmine.createSpy().andReturn(DATA_OUT);
             fileSystemMock = { writeFile : null, readFile : null };
-            spyOn(fileSystemMock, 'writeFile').andCallFake( fsWriteFake );
-            spyOn(fileSystemMock, 'readFile').andCallFake( fsReadFake );
+            spyOn(fileSystemMock, 'readFile').andCallFake( fakeRead.readFile );
+            spyOn(fileSystemMock, 'writeFile').andCallFake( fakeWrite.writeFile );
             convertFile = UT.fileConverter(fileSystemMock, convertDataMock, excHandlerMock);
         });
+
 
         describe('happy path', function(){
             beforeEach(function(){
@@ -237,16 +285,75 @@
             });
         });
 
+
         it('should pass exception to exceptionHandler on file read', function(){
-            readError = { x: 'read-exc' };
+            var err = { x: 'read-exc' };
+            fakeRead.setReadErrData(err, null);
+
             callConvertFileWithOptions();
-            expect(excHandlerMock).toHaveBeenCalledWith(readError);
+
+            expect(excHandlerMock).toHaveBeenCalledWith(err);
         });
 
         it('should pass exception to exceptionHandler on file write', function(){
-            writeError = { x: 'write-exc' };
+            var err = { x: 'write-exc' };
+            fakeWrite.setWriteErr(err);
+
             callConvertFileWithOptions();
-            expect(excHandlerMock).toHaveBeenCalledWith(writeError);
+
+            expect(excHandlerMock).toHaveBeenCalledWith(err);
+        });
+    });
+
+    describe('standardRunGraph (is it unit yet? necessary? maybe e2e are enough?)', function(){
+        var runner, fsMock, consoleMock, processMock,
+            fakeRead, fakeWrite;
+
+        beforeEach(function(){
+            fakeRead = new FakeFsReadFile();
+            fakeWrite = new FakeFsWriteFile();
+            fsMock =  { readFile: null, writeFile : null };
+            spyOn(fsMock, 'readFile').andCallFake( fakeRead.readFile );
+            spyOn(fsMock, 'writeFile').andCallFake( fakeWrite.writeFile );
+
+            consoleMock = jasmine.createSpyObj('consoleMock', ['log']);
+            processMock = jasmine.createSpyObj('processMock', ['exit']);
+            runner = UT.standardRunGraph(consoleMock, fsMock, processMock);
+        });
+
+        it('should convert', function(){
+            fakeRead.setReadErrData(null, '0:11\nFirst');
+
+            runner(['node', 'script', 'file-in']);
+
+            expect(fsMock.writeFile).toHaveBeenCalledWith(jasmine.any(String), '00:00:11:First\n', jasmine.any(Object), jasmine.any(Function));
+
+        });
+    });
+
+
+    //the triumph of form over substance, is it worth to test such things?
+    describe('exceptionHandlerPrintExit', function(){
+        var processMock, consoleMock, exceptionHandler;
+
+        beforeEach(function(){
+            processMock = jasmine.createSpyObj('processMock', ['exit']);
+            consoleMock = jasmine.createSpyObj('consoleMock', ['log']);
+            exceptionHandler = UT.exceptionHandlerPrintExit(processMock, consoleMock);
+        });
+
+        it('should do nothing if there is no error', function(){
+            exceptionHandler(null);
+
+            expect(processMock.exit).not.toHaveBeenCalled();
+            expect(consoleMock.log).not.toHaveBeenCalled();
+        });
+
+        it('should print error and call exit(1) on error', function(){
+            exceptionHandler({ stack : 'stack'});
+
+            expect(processMock.exit).toHaveBeenCalledWith(1);
+            expect(consoleMock.log).toHaveBeenCalledWith(jasmine.any(String));
         });
     });
 
