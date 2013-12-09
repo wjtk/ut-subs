@@ -4,7 +4,7 @@ node.js ut subs converter.
 
 * get newest stable version:
 ```
-git checkout v1.1.1		
+git checkout v1.2.0
 ```
 * get file:
 ```
