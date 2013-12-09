@@ -12,6 +12,11 @@ var exec = require('child_process').exec;
 describe('e2e test', function(){
     'use strict';
 
+    function e2eLog(message) {
+        console.log('e2e>> ' + message);
+
+    }
+
     function testConversion(pSource, pConverted, pExpected, sourceEncodingOpt, targetEncodingOpt) {
         var flag = {};
 
@@ -22,10 +27,10 @@ describe('e2e test', function(){
         function clearWaitingOrThrow() {
             if(flag.err) {
                 if(!!flag.stdOut || flag.stdErr) {
-                    console.log('e2e>> Error occurred with additional info:');
-                    console.log('e2e>> ERR:' + flag.err);
-                    console.log('e2e>> STDOUT: ' + flag.stdOut);
-                    console.log('e2e>> STDERR: ' + flag.stdErr);
+                    e2eLog('Error occurred with additional info:');
+                    e2eLog('ERR:' + flag.err);
+                    e2eLog('STDOUT: ' + flag.stdOut);
+                    e2eLog('STDERR: ' + flag.stdErr);
                 }
                 throw flag.err;
             }
@@ -53,8 +58,12 @@ describe('e2e test', function(){
         sourceEncodingOpt = !sourceEncodingOpt ? '' : sourceEncodingOpt;
 
         runs(function(){
+            var command = 'node src/main/javascript/ut-subs.js ' + pSource + ' ' + sourceEncodingOpt;
+
             clearWaitingOrThrow();
-            exec('node src/main/javascript/ut-subs.js ' + pSource + ' ' + sourceEncodingOpt, function(err, stdout, stdErr){
+            e2eLog('running command:');
+            e2eLog(command);
+            exec(command, function(err, stdout, stdErr){
                 flag.stdOut = '' + stdout;
                 flag.stdErr = '' + stdErr;
                 goFurther(flag, err);
@@ -88,12 +97,12 @@ describe('e2e test', function(){
     }
 
     it('should convert from utf-8 to utf-8', function(){
-        testConversion('target/e2e-data/ex1(utf-8).txt', 'target/e2e-data/ex1(utf-8).txt.ut-subs', 'target/e2e-data/ex1(utf-8).expected');
+        testConversion('target/e2e-data/ex1_utf-8.txt', 'target/e2e-data/ex1_utf-8.txt.ut-subs', 'target/e2e-data/ex1_utf-8.expected');
     });
 
 
      it('should convert from utf-16le to utf-8', function(){
-        testConversion('target/e2e-data/ex2(utf-16le).txt', 'target/e2e-data/ex2(utf-16le).txt.ut-subs', 'target/e2e-data/ex2(utf-8).expected', 'utf-16le');
+        testConversion('target/e2e-data/ex2_utf-16le.txt', 'target/e2e-data/ex2_utf-16le.txt.ut-subs', 'target/e2e-data/ex2_utf-8.expected', 'utf-16le');
      });
 
 

@@ -6,7 +6,5 @@ if [ ! -f script/e2e-tests.sh ]; then
     exit
 fi
 
-rm -rf target/e2e-data
-mkdir -p target/e2e-data
-cp src/test/resources/e2e-data/* target/e2e-data
+script/copy-e2e-resources.sh
 jasmine-node --verbose src/test/javascript/e2e

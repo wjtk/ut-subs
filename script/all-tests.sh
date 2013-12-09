@@ -5,4 +5,5 @@ if [ ! -f script/all-tests.sh ]; then
     exit
 fi
 
+script/copy-e2e-resources.sh
 jasmine-node --verbose src/test/javascript

@@ -1,0 +1,9 @@
+language: node_js
+node_js:
+  - "0.10"      #most recent 0.10 version, I have 0.10.22
+install:
+  - npm install -g jasmine-node
+before_script:
+  - chmod -R 777 script/*.sh
+script:
+  - script/all-tests.sh
