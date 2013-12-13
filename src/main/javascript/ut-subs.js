@@ -175,8 +175,10 @@
 
             if(args.length < 3) {
                 console.log('usage:');
-                console.log('node ut-subs.js <file-to-conver> [in-encoding] [out-encoding]');
-                console.log('node ut-subs.js --version');
+                console.log('  node ut-subs.js <file-to-convert> [in-encoding] [out-encoding]');
+                console.log('  node ut-subs.js --version');
+                console.log('');
+                console.log('    default in/out encoding: utf-8');
                 return;
             }
             if( args[2] === '--version' ) {

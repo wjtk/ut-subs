@@ -218,7 +218,7 @@
             runner = UT.runner(consoleMock, convertFileMock);
         });
 
-        it('should show usage when there are only 2 args', function(){
+        it('should show usage when there are only 2 args(0 additional, only "node script")', function(){
             runner(['node', 'script']);
 
             expect(consoleMock.log).toHaveBeenCalledWith('usage:');
